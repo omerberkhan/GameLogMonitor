@@ -29,13 +29,13 @@ except Exception as e:
 # Load location IDs globally
 LOCATION_IDS = {}
 try:
-    location_ids_path = Path("location-ids.json")
+    location_ids_path = Path("location_ids.json")
     if location_ids_path.exists():
         with open(location_ids_path, 'r', encoding='utf-8') as file:
             LOCATION_IDS = json.load(file)
-        print(f"Loaded {len(LOCATION_IDS)} location IDs from location-ids.json")
+        print(f"Loaded {len(LOCATION_IDS)} location IDs from location_ids.json")
     else:
-        print("location-ids.json not found")
+        print("location_ids.json not found")
 except Exception as e:
     print(f"Error loading location IDs: {e}")
 
