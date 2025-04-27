@@ -9,7 +9,7 @@ import pystray
 from PIL import Image, ImageDraw, ImageFont
 import queue
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import configparser
 import json
 
@@ -54,7 +54,8 @@ class LogMonitorApp:
         # Variables for application state
         self.monitoring = False
         self.log_file_path = None
-        self.death_lines = []
+        self.death_lines = []  # Lines shown in overlay
+        self.death_times = []  # Timestamps for each death line
         self.all_death_records = []  # Store all death records
         self.line_queue = queue.Queue()
         self.overlay_window = None
@@ -76,6 +77,7 @@ class LogMonitorApp:
             "position_x": 100,
             "position_y": 100,
             "max_lines": 5,  # Default number of lines to display
+            "time_threshold": 2,  # Default time in minutes to keep death lines
         }
         
         # Default game log paths to check
@@ -121,7 +123,7 @@ class LogMonitorApp:
                     for key in self.overlay_settings:
                         if key in config['Overlay']:
                             # Convert values to appropriate types
-                            if key in ['font_size', 'width', 'height', 'position_x', 'position_y', 'max_lines']:
+                            if key in ['font_size', 'width', 'height', 'position_x', 'position_y', 'max_lines', 'time_threshold']:
                                 self.overlay_settings[key] = int(config['Overlay'][key])
                             elif key == 'opacity':
                                 self.overlay_settings[key] = float(config['Overlay'][key])
@@ -210,7 +212,7 @@ class LogMonitorApp:
         """Show the settings dialog"""
         settings_window = tk.Toplevel(self.root)
         settings_window.title("Overlay Settings")
-        settings_window.geometry("400x520")  # Increased height for additional settings
+        settings_window.geometry("400x580")  # Increased height for additional settings
         settings_window.resizable(False, False)
         settings_window.transient(self.root)
         settings_window.grab_set()
@@ -316,6 +318,12 @@ class LogMonitorApp:
         max_lines_var = tk.IntVar(value=self.overlay_settings["max_lines"])
         max_lines_spinner = ttk.Spinbox(settings_frame, from_=1, to=20, textvariable=max_lines_var, width=5)
         max_lines_spinner.grid(row=8, column=1, sticky=tk.W, pady=5)
+        
+        # Time threshold for death lines
+        ttk.Label(settings_frame, text="Keep Death Lines (minutes):").grid(row=9, column=0, sticky=tk.W, pady=5)
+        time_threshold_var = tk.IntVar(value=self.overlay_settings["time_threshold"])
+        time_threshold_spinner = ttk.Spinbox(settings_frame, from_=1, to=60, textvariable=time_threshold_var, width=5)
+        time_threshold_spinner.grid(row=9, column=1, sticky=tk.W, pady=5)
                 
         # Buttons
         buttons_frame = ttk.Frame(settings_window)
@@ -337,6 +345,7 @@ class LogMonitorApp:
             self.overlay_settings["width"] = width_var.get()
             self.overlay_settings["height"] = height_var.get()
             self.overlay_settings["max_lines"] = max_lines_var.get()
+            self.overlay_settings["time_threshold"] = time_threshold_var.get()
             
             # Apply settings to overlay if it exists
             if self.overlay_window:
@@ -589,6 +598,9 @@ class LogMonitorApp:
             
         # Start processing queue in a separate thread
         threading.Thread(target=self.process_queue, daemon=True).start()
+        
+        # Schedule regular cleanup of old death lines
+        self.schedule_death_lines_cleanup()
 
     def stop_monitoring(self):
         self.monitoring = False
@@ -823,10 +835,17 @@ class LogMonitorApp:
                         # If parsing failed, add the raw line
                         self.all_death_records.append(line)
                     
-                    # Add to death lines list (keep only the specified number of lines for overlay)
+                    # Current timestamp
+                    current_time = datetime.now()
+                    
+                    # Add to death lines list with timestamp
                     self.death_lines.append(line)
+                    self.death_times.append(current_time)
+                    
+                    # Keep only the specified number of lines for overlay
                     if len(self.death_lines) > self.overlay_settings["max_lines"]:
                         self.death_lines.pop(0)
+                        self.death_times.pop(0)
                         
                     # Update overlay text
                     self.update_overlay_text()
@@ -835,6 +854,9 @@ class LogMonitorApp:
                     if hasattr(self, 'records_window') and self.records_window and self.records_window.winfo_exists():
                         self.root.after(10, self.update_records_list)
                 
+                # Clean up old death lines (older than the time threshold)
+                self.cleanup_old_death_lines()
+                
                 time.sleep(0.1)
                 
             except queue.Empty:
@@ -842,6 +864,28 @@ class LogMonitorApp:
             except Exception as e:
                 print(f"Error processing queue: {e}")
                 time.sleep(0.1)
+                
+    def cleanup_old_death_lines(self):
+        """Remove death lines older than the time threshold from the overlay"""
+        if not self.death_lines:
+            return
+            
+        current_time = datetime.now()
+        # Use the configurable time threshold
+        threshold_minutes = self.overlay_settings.get("time_threshold", 2)
+        cutoff_time = current_time - timedelta(minutes=threshold_minutes)
+        
+        # Check if we have any lines to remove
+        removed = False
+        while self.death_times and self.death_times[0] < cutoff_time:
+            # Remove the oldest line
+            self.death_lines.pop(0)
+            self.death_times.pop(0)
+            removed = True
+            
+        # Update overlay if we removed any lines
+        if removed:
+            self.update_overlay_text()
 
     def parse_death_line(self, line):
         """Parse a death line to extract useful information"""
@@ -1274,6 +1318,14 @@ class LogMonitorApp:
             self.lock_button.config(text="Unlock Overlay")
         else:
             self.lock_button.config(text="Lock Overlay")
+
+    def schedule_death_lines_cleanup(self):
+        """Schedule regular cleanup of old death lines"""
+        if self.monitoring:
+            # Clean up old death lines
+            self.cleanup_old_death_lines()
+            # Schedule next cleanup
+            self.root.after(10000, self.schedule_death_lines_cleanup)  # Check every 10 seconds
 
 def main():
     # Set up exception handling to show error messages in dialogs
