@@ -43,7 +43,7 @@ class LogMonitorApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Game Log Monitor")
-        self.root.geometry("500x180")
+        self.root.geometry("700x180")  # Increased width to fit the Records button
         self.root.resizable(False, False)
         
         # Config file path
@@ -55,6 +55,7 @@ class LogMonitorApp:
         self.monitoring = False
         self.log_file_path = None
         self.death_lines = []
+        self.all_death_records = []  # Store all death records
         self.line_queue = queue.Queue()
         self.overlay_window = None
         self.overlay_locked = True
@@ -92,6 +93,9 @@ class LogMonitorApp:
         
         # Setup system tray
         self.setup_system_tray()
+        
+        # Minimize to tray instead of taskbar
+        self.root.bind("<Unmap>", lambda e: self.withdraw_to_tray() if self.root.state() == 'iconic' else None)
         
         # Window close event
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -167,16 +171,24 @@ class LogMonitorApp:
         buttons_frame.pack(pady=10, fill=tk.X)
         
         # Toggle button for start/stop monitoring
-        self.toggle_button = ttk.Button(buttons_frame, text="Start Monitoring", width=20, command=self.toggle_monitoring)
+        self.toggle_button = ttk.Button(buttons_frame, text="Start Monitoring", width=15, command=self.toggle_monitoring)
         self.toggle_button.pack(side=tk.LEFT, padx=5)
         
         # Select log file button
-        self.select_button = ttk.Button(buttons_frame, text="Select Log File", width=20, command=self.select_log_file)
+        self.select_button = ttk.Button(buttons_frame, text="Select Log File", width=15, command=self.select_log_file)
         self.select_button.pack(side=tk.LEFT, padx=5)
         
         # Settings button
-        self.settings_button = ttk.Button(buttons_frame, text="Overlay Settings", width=20, command=self.show_settings)
+        self.settings_button = ttk.Button(buttons_frame, text="Overlay Settings", width=15, command=self.show_settings)
         self.settings_button.pack(side=tk.LEFT, padx=5)
+        
+        # Toggle overlay lock button
+        self.lock_button = ttk.Button(buttons_frame, text="Unlock Overlay" if self.overlay_locked else "Lock Overlay", width=15, command=self.toggle_overlay_lock_from_ui)
+        self.lock_button.pack(side=tk.LEFT, padx=5)
+        
+        # Records button
+        self.records_button = ttk.Button(buttons_frame, text="Show Records", width=15, command=self.show_records_window)
+        self.records_button.pack(side=tk.LEFT, padx=5)
         
         # Display loaded weapon and location count
         weapon_count = len(self.weapon_ids)
@@ -724,6 +736,13 @@ class LogMonitorApp:
     def toggle_overlay_lock(self):
         self.overlay_locked = not self.overlay_locked
         
+        # Update lock button text if it exists
+        if hasattr(self, 'lock_button'):
+            if self.overlay_locked:
+                self.lock_button.config(text="Unlock Overlay")
+            else:
+                self.lock_button.config(text="Lock Overlay")
+        
         # Update status label to show locked/unlocked state
         if self.overlay_window:
             locked_status = "locked" if self.overlay_locked else "unlocked"
@@ -794,13 +813,27 @@ class LogMonitorApp:
                 if not self.line_queue.empty():
                     line = self.line_queue.get(block=False)
                     
-                    # Add to death lines list (keep only the specified number of lines)
+                    # Parse the line to extract details
+                    parsed_data = self.parse_death_line(line)
+                    
+                    # Add parsed data to all_death_records
+                    if parsed_data:
+                        self.all_death_records.append(parsed_data)
+                    else:
+                        # If parsing failed, add the raw line
+                        self.all_death_records.append(line)
+                    
+                    # Add to death lines list (keep only the specified number of lines for overlay)
                     self.death_lines.append(line)
                     if len(self.death_lines) > self.overlay_settings["max_lines"]:
                         self.death_lines.pop(0)
                         
                     # Update overlay text
-                    self.update_overlay_text()                    
+                    self.update_overlay_text()
+                    
+                    # Update the records list if window is open
+                    if hasattr(self, 'records_window') and self.records_window and self.records_window.winfo_exists():
+                        self.root.after(10, self.update_records_list)
                 
                 time.sleep(0.1)
                 
@@ -925,9 +958,13 @@ class LogMonitorApp:
         self.root.after(0, self.root.deiconify)
         self.root.after(0, self.root.lift)
 
+    def withdraw_to_tray(self):
+        """Hide the window and keep only system tray icon"""
+        self.root.withdraw()
+
     def on_close(self):
         # Hide main window instead of closing
-        self.root.withdraw()
+        self.exit_app()
 
     def exit_app(self):
         # Stop monitoring before exit
@@ -1052,6 +1089,191 @@ class LogMonitorApp:
             display_name = ' '.join(word.capitalize() for word in display_name.split('_'))
         
         return display_name
+
+    def show_records_window(self):
+        """Show a window with all death records"""
+        # Create new window if it doesn't exist or was closed
+        if not hasattr(self, 'records_window') or not self.records_window or not self.records_window.winfo_exists():
+            self.records_window = tk.Toplevel(self.root)
+            self.records_window.title("Death Records")
+            self.records_window.geometry("800x600")
+            self.records_window.minsize(600, 400)
+            
+            # Create main frame
+            main_frame = ttk.Frame(self.records_window, padding="10")
+            main_frame.pack(fill=tk.BOTH, expand=True)
+            
+            # Add title
+            title_label = ttk.Label(main_frame, text="Death Records", font=("Arial", 14, "bold"))
+            title_label.pack(pady=(0, 10))
+            
+            # Add records listbox with scrollbar inside a frame
+            list_frame = ttk.Frame(main_frame)
+            list_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+            
+            # Create scrollbars
+            y_scrollbar = ttk.Scrollbar(list_frame)
+            y_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+            
+            x_scrollbar = ttk.Scrollbar(list_frame, orient=tk.HORIZONTAL)
+            x_scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
+            
+            # Create the list with fixed-width font for better readability
+            self.records_list = tk.Listbox(
+                list_frame, 
+                font=("Consolas", 10),
+                selectmode=tk.EXTENDED,
+                yscrollcommand=y_scrollbar.set,
+                xscrollcommand=x_scrollbar.set
+            )
+            self.records_list.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            
+            # Configure scrollbars
+            y_scrollbar.config(command=self.records_list.yview)
+            x_scrollbar.config(command=self.records_list.xview)
+            
+            # Add buttons frame
+            buttons_frame = ttk.Frame(main_frame)
+            buttons_frame.pack(fill=tk.X, pady=10)
+            
+            # Add clear button
+            clear_button = ttk.Button(buttons_frame, text="Clear All Records", 
+                                    command=self.clear_records)
+            clear_button.pack(side=tk.LEFT, padx=5)
+            
+            # Add export button
+            export_button = ttk.Button(buttons_frame, text="Export Records", 
+                                     command=self.export_records)
+            export_button.pack(side=tk.LEFT, padx=5)
+            
+            # Add close button
+            close_button = ttk.Button(buttons_frame, text="Close", 
+                                    command=self.records_window.destroy)
+            close_button.pack(side=tk.RIGHT, padx=5)
+            
+            # Populate the list with existing records
+            self.update_records_list()
+        else:
+            # If window exists, just bring it to front
+            self.records_window.lift()
+            self.records_window.focus_force()
+            # Update the list in case new records were added
+            self.update_records_list()
+    
+    def update_records_list(self):
+        """Update the records list with all death records"""
+        if hasattr(self, 'records_list'):
+            # Clear the list
+            self.records_list.delete(0, tk.END)
+            
+            # Add each record
+            for record in self.all_death_records:
+                # Format record for display
+                if isinstance(record, dict):
+                    # Format timestamp
+                    timestamp = record.get('timestamp', 'Unknown')
+                    if timestamp and timestamp != 'Unknown':
+                        try:
+                            # Parse ISO timestamp to local time
+                            utc_time = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
+                            utc_time = utc_time.replace(tzinfo=timezone.utc)
+                            local_time = utc_time.astimezone()
+                            formatted_time = local_time.strftime("%Y-%m-%d %H:%M:%S")
+                        except:
+                            formatted_time = timestamp
+                    else:
+                        formatted_time = 'Unknown'
+                    
+                    # Get weapon and location names
+                    weapon_name = self.get_weapon_name(record.get('weapon', '')) or 'Unknown'
+                    location_name = self.get_location_name(record.get('location', '')) or 'Unknown'
+                    
+                    # Format: [TIME] PLAYER killed by KILLER using WEAPON - DAMAGE @ LOCATION
+                    display_text = f"[{formatted_time}] {record.get('actor', 'Unknown')} killed by {record.get('killer', 'Unknown')} "
+                    if weapon_name != 'Unknown':
+                        display_text += f"using {weapon_name} "
+                    display_text += f"- {record.get('damage', 'Unknown')} @ {location_name}"
+                    
+                    self.records_list.insert(tk.END, display_text)
+                else:
+                    # If not a parsed record, just add the raw line
+                    self.records_list.insert(tk.END, str(record))
+    
+    def clear_records(self):
+        """Clear all death records"""
+        if hasattr(self, 'records_list'):
+            # Confirm before clearing
+            if messagebox.askyesno("Clear Records", "Are you sure you want to clear all records?"):
+                self.all_death_records.clear()
+                self.update_records_list()
+    
+    def export_records(self):
+        """Export records to a file"""
+        if not self.all_death_records:
+            messagebox.showinfo("Export", "No records to export")
+            return
+            
+        # Ask for file location
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV Files", "*.csv"), ("Text Files", "*.txt"), ("All Files", "*.*")]
+        )
+        
+        if not file_path:
+            return
+            
+        try:
+            with open(file_path, 'w', encoding='utf-8', newline='') as f:
+                # If CSV file, use CSV writer
+                if file_path.lower().endswith('.csv'):
+                    import csv
+                    writer = csv.writer(f)
+                    # Write header
+                    writer.writerow(["Timestamp", "Player", "Killer", "Weapon", "Damage Type", "Location"])
+                    
+                    # Write records
+                    for record in self.all_death_records:
+                        if isinstance(record, dict):
+                            writer.writerow([
+                                record.get('timestamp', ''),
+                                record.get('actor', ''),
+                                record.get('killer', ''),
+                                self.get_weapon_name(record.get('weapon', '')),
+                                record.get('damage', ''),
+                                self.get_location_name(record.get('location', ''))
+                            ])
+                        else:
+                            # Raw line
+                            writer.writerow([str(record), '', '', '', '', ''])
+                else:
+                    # For text files, just write lines
+                    for record in self.all_death_records:
+                        if isinstance(record, dict):
+                            # Format similar to display
+                            weapon_name = self.get_weapon_name(record.get('weapon', '')) or 'Unknown'
+                            location_name = self.get_location_name(record.get('location', '')) or 'Unknown'
+                            
+                            line = f"[{record.get('timestamp', 'Unknown')}] {record.get('actor', 'Unknown')} killed by {record.get('killer', 'Unknown')}"
+                            if weapon_name != 'Unknown':
+                                line += f" using {weapon_name}"
+                            line += f" - {record.get('damage', 'Unknown')} @ {location_name}\n"
+                            f.write(line)
+                        else:
+                            # Raw line
+                            f.write(f"{str(record)}\n")
+                            
+            messagebox.showinfo("Export", f"Records exported to {file_path}")
+        except Exception as e:
+            messagebox.showerror("Export Error", f"Error exporting records: {e}")
+
+    def toggle_overlay_lock_from_ui(self):
+        """Toggle overlay lock state from UI button"""
+        self.toggle_overlay_lock()
+        # Update button text
+        if self.overlay_locked:
+            self.lock_button.config(text="Unlock Overlay")
+        else:
+            self.lock_button.config(text="Lock Overlay")
 
 def main():
     # Set up exception handling to show error messages in dialogs
