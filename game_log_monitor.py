@@ -12,6 +12,13 @@ import re
 from datetime import datetime, timezone, timedelta
 import configparser
 import json
+import ctypes
+from ctypes import wintypes
+
+# Windows API constants for click-through overlay
+GWL_EXSTYLE = -20
+WS_EX_LAYERED = 0x00080000
+WS_EX_TRANSPARENT = 0x00000020
 
 # Load weapon IDs globally
 WEAPON_IDS = {}
@@ -587,7 +594,11 @@ class LogMonitorApp:
             self.apply_overlay_settings()
             # Process events to ensure window is shown
             self.root.update()
-            
+
+            # Apply click-through if overlay is locked
+            if self.overlay_locked:
+                self.set_clickthrough(True)
+
             # Schedule visibility check
             self.root.after(500, self.check_overlay_visibility)
             
@@ -717,7 +728,13 @@ class LogMonitorApp:
         self.death_text.config(state=tk.NORMAL)
         self.death_text.insert(tk.END, "Waiting for death events...\n", "death_line")
         self.death_text.config(state=tk.DISABLED)
-        
+
+        # Set click-through if overlay starts locked
+        if self.overlay_locked:
+            # Need to ensure window is visible first for the API call to work
+            self.overlay_window.update()
+            self.set_clickthrough(True)
+
         # Initially hide the window
         # We'll show it in start_monitoring instead
         self.overlay_window.withdraw()
@@ -745,26 +762,54 @@ class LogMonitorApp:
             y = self.overlay_window.winfo_y() + dy
             self.overlay_window.geometry(f"+{x}+{y}")
 
+    def set_clickthrough(self, enabled):
+        """Enable or disable click-through for the overlay window"""
+        if not self.overlay_window:
+            return
+
+        try:
+            # Get window handle
+            hwnd = ctypes.windll.user32.GetParent(self.overlay_window.winfo_id())
+
+            # Get current window style
+            style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+
+            if enabled:
+                # Add WS_EX_LAYERED and WS_EX_TRANSPARENT to make window click-through
+                style = style | WS_EX_LAYERED | WS_EX_TRANSPARENT
+            else:
+                # Remove WS_EX_TRANSPARENT to make window clickable
+                style = style & ~WS_EX_TRANSPARENT
+
+            # Set the new window style
+            ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
+        except Exception as e:
+            print(f"Error setting click-through: {e}")
+
     def toggle_overlay_lock(self):
         self.overlay_locked = not self.overlay_locked
-        
+
         # Update lock button text if it exists
         if hasattr(self, 'lock_button'):
             if self.overlay_locked:
                 self.lock_button.config(text="Unlock Overlay")
             else:
                 self.lock_button.config(text="Lock Overlay")
-        
+
         # Update status label to show locked/unlocked state
         if self.overlay_window:
             locked_status = "locked" if self.overlay_locked else "unlocked"
-            self.status_label.config(text=f"Overlay {locked_status} - {'not draggable' if self.overlay_locked else 'draggable'}")
-            
-            # Add border when locked, remove when unlocked
+            click_status = "click-through" if self.overlay_locked else "draggable"
+            self.status_label.config(text=f"Overlay {locked_status} - {click_status}")
+
+            # Add border when unlocked, remove when locked
             if not self.overlay_locked:
                 self.overlay_window.configure(highlightbackground="#00FF00", highlightthickness=5)
             else:
                 self.overlay_window.configure(highlightbackground="#000000", highlightthickness=0)
+
+            # Enable click-through when locked, disable when unlocked
+            self.set_clickthrough(self.overlay_locked)
 
     def monitor_log_file(self):
         # Initial file position

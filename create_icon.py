@@ -38,8 +38,8 @@ def create_app_icon():
         draw.text((90, 100), text, fill=(200, 200, 255, 255))
     
     # Save the icon in multiple formats
-    img.save("app_icon.ico", sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (256, 256)])
-    img.save("app_icon.png")
+    img.save("static/app_icon.ico", sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (256, 256)])
+    img.save("static/app_icon.png")
     
     print("Icon created successfully: app_icon.ico and app_icon.png")
 

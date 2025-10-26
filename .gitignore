@@ -1,8 +1,51 @@
-__pycache__
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
 .venv
+venv/
+ENV/
+env/
 
-dist
-build
+# PyInstaller
+dist/
+build/
+*.spec
+*.manifest
 
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Application specific
 app_icon.ico
 app_icon.png
+*.log
+Game.log
+
+# User settings
+settings.ini
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
+# Distribution / packaging
+*.egg-info/
+.installed.cfg
+*.egg
