@@ -60,7 +60,7 @@ except Exception as e:
 class LogMonitorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Game Log Monitor")
+        self.root.title("Kill Collector - Atmosfer")
         self.root.geometry("750x250")  # Height increased to fit Discord frame and account label
         self.root.resizable(False, False)
         
@@ -199,7 +199,7 @@ class LogMonitorApp:
         main_frame.pack(fill=tk.BOTH, expand=True)
         
         # Title label
-        title_label = ttk.Label(main_frame, text="Game Log Monitor", font=("Arial", 14, "bold"))
+        title_label = ttk.Label(main_frame, text="Kill Collector - Atmosfer", font=("Arial", 14, "bold"))
         title_label.pack(pady=(0, 5))
 
         # Account name label
@@ -208,11 +208,11 @@ class LogMonitorApp:
         self.update_account_display()
         
         # Status frame
-        status_frame = ttk.LabelFrame(main_frame, text="Status", padding="5")
+        status_frame = ttk.LabelFrame(main_frame, text="Durum", padding="5")
         status_frame.pack(fill=tk.X, pady=5)
         
         # Status label
-        self.status_label = ttk.Label(status_frame, text="Game.log not found. Please select file location.")
+        self.status_label = ttk.Label(status_frame, text="Game.log dosyası bulunamadı. Lütfen dosya konumunu seçin.")
         self.status_label.pack(pady=5, fill=tk.X)
         
         # Buttons frame
@@ -220,34 +220,34 @@ class LogMonitorApp:
         buttons_frame.pack(pady=10, fill=tk.X)
         
         # Toggle button for start/stop monitoring
-        self.toggle_button = ttk.Button(buttons_frame, text="Start Monitoring", width=15, command=self.toggle_monitoring)
+        self.toggle_button = ttk.Button(buttons_frame, text="Başlat", width=15, command=self.toggle_monitoring)
         self.toggle_button.pack(side=tk.LEFT, padx=5)
         
         # Select log file button
-        self.select_button = ttk.Button(buttons_frame, text="Select Log File", width=15, command=self.select_log_file)
+        self.select_button = ttk.Button(buttons_frame, text="Log Dosyasını Seç", width=18, command=self.select_log_file)
         self.select_button.pack(side=tk.LEFT, padx=5)
         
         # Settings button
-        self.settings_button = ttk.Button(buttons_frame, text="Overlay Settings", width=15, command=self.show_settings)
+        self.settings_button = ttk.Button(buttons_frame, text="Overlay Ayarları", width=15, command=self.show_settings)
         self.settings_button.pack(side=tk.LEFT, padx=5)
         
         # Toggle overlay lock button
-        self.lock_button = ttk.Button(buttons_frame, text="Unlock Overlay" if self.overlay_locked else "Lock Overlay", width=15, command=self.toggle_overlay_lock_from_ui)
+        self.lock_button = ttk.Button(buttons_frame, text="Overlay Kilidini Kaldır" if self.overlay_locked else "Overlay Kilitle", width=20, command=self.toggle_overlay_lock_from_ui)
         self.lock_button.pack(side=tk.LEFT, padx=5)
         
         # Records button
-        self.records_button = ttk.Button(buttons_frame, text="Show Records", width=15, command=self.show_records_window)
+        self.records_button = ttk.Button(buttons_frame, text="Kayıtları Göster", width=15, command=self.show_records_window)
         self.records_button.pack(side=tk.LEFT, padx=5)
 
         # Discord webhook frame
-        discord_frame = ttk.LabelFrame(main_frame, text="Discord Integration", padding="5")
+        discord_frame = ttk.LabelFrame(main_frame, text="Discord Entegrasyonu", padding="5")
         discord_frame.pack(fill=tk.X, pady=5)
 
         # Enable Discord checkbox
         self.discord_enabled_var = tk.BooleanVar(value=self.discord_settings['enabled'])
         self.discord_check = ttk.Checkbutton(
             discord_frame,
-            text="Enable Discord Webhook (post only when I kill someone)",
+            text="Discord Bildirimlerini Etkinleştir (sadece sen birini öldürdüğünde gönderir)",
             variable=self.discord_enabled_var,
             command=self.toggle_discord_webhook
         )
@@ -259,12 +259,12 @@ class LogMonitorApp:
         
         status_text = ""
         if weapon_count > 0:
-            status_text += f"Loaded {weapon_count} weapon IDs"
+            status_text += f"Yüklenen {weapon_count} silah ID'si"
         if location_count > 0:
             if status_text:
-                status_text += f", {location_count} location IDs"
+                status_text += f", {location_count} konum ID'si"
             else:
-                status_text += f"Loaded {location_count} location IDs"
+                status_text += f"Yüklenen {location_count} konum ID'si"
                 
         if status_text:
             self.status_label.config(text=status_text)
@@ -272,7 +272,7 @@ class LogMonitorApp:
     def show_settings(self):
         """Show the settings dialog"""
         settings_window = tk.Toplevel(self.root)
-        settings_window.title("Overlay Settings")
+        settings_window.title("Overlay Ayarları")
         settings_window.geometry("400x580")  # Increased height for additional settings
         settings_window.resizable(False, False)
         settings_window.transient(self.root)
@@ -283,33 +283,33 @@ class LogMonitorApp:
         settings_frame.pack(fill=tk.BOTH, expand=True)
         
         # Text color
-        ttk.Label(settings_frame, text="Text Color:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        ttk.Label(settings_frame, text="Metin Rengi:").grid(row=0, column=0, sticky=tk.W, pady=5)
         text_color_frame = ttk.Frame(settings_frame)
         text_color_frame.grid(row=0, column=1, sticky=tk.W, pady=5)
         
         text_color_preview = tk.Label(text_color_frame, bg=self.overlay_settings["text_color"], width=3, height=1)
         text_color_preview.pack(side=tk.LEFT)
-        
-        ttk.Button(text_color_frame, text="Change", command=lambda: self.choose_color("text_color", text_color_preview)).pack(side=tk.LEFT, padx=5)
-        
+
+        ttk.Button(text_color_frame, text="Değiştir", command=lambda: self.choose_color("text_color", text_color_preview)).pack(side=tk.LEFT, padx=5)
+
         # Background color
-        ttk.Label(settings_frame, text="Background Color:").grid(row=1, column=0, sticky=tk.W, pady=5)
+        ttk.Label(settings_frame, text="Arka Plan Rengi:").grid(row=1, column=0, sticky=tk.W, pady=5)
         bg_color_frame = ttk.Frame(settings_frame)
         bg_color_frame.grid(row=1, column=1, sticky=tk.W, pady=5)
         
         bg_color_preview = tk.Label(bg_color_frame, bg=self.overlay_settings["bg_color"], width=3, height=1)
         bg_color_preview.pack(side=tk.LEFT)
-        
-        ttk.Button(bg_color_frame, text="Change", command=lambda: self.choose_color("bg_color", bg_color_preview)).pack(side=tk.LEFT, padx=5)
-        
+
+        ttk.Button(bg_color_frame, text="Değiştir", command=lambda: self.choose_color("bg_color", bg_color_preview)).pack(side=tk.LEFT, padx=5)
+
         # Font size
-        ttk.Label(settings_frame, text="Font Size:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        ttk.Label(settings_frame, text="Yazı Tipi Boyutu:").grid(row=2, column=0, sticky=tk.W, pady=5)
         font_size_var = tk.IntVar(value=self.overlay_settings["font_size"])
         font_size_spinner = ttk.Spinbox(settings_frame, from_=8, to=20, textvariable=font_size_var, width=5)
         font_size_spinner.grid(row=2, column=1, sticky=tk.W, pady=5)
         
         # Opacity
-        ttk.Label(settings_frame, text="Opacity:").grid(row=3, column=0, sticky=tk.W, pady=5)
+        ttk.Label(settings_frame, text="Opaklık:").grid(row=3, column=0, sticky=tk.W, pady=5)
         opacity_frame = ttk.Frame(settings_frame)
         opacity_frame.grid(row=3, column=1, sticky=tk.W, pady=5)
         
@@ -328,7 +328,7 @@ class LogMonitorApp:
         opacity_scale.bind("<Motion>", update_opacity_label)
         
         # Transparent background checkbox
-        ttk.Label(settings_frame, text="Transparent Background:").grid(row=4, column=0, sticky=tk.W, pady=5)
+        ttk.Label(settings_frame, text="Şeffaf Arka Plan:").grid(row=4, column=0, sticky=tk.W, pady=5)
         transparent_frame = ttk.Frame(settings_frame)
         transparent_frame.grid(row=4, column=1, sticky=tk.W, pady=5)
         
@@ -338,7 +338,7 @@ class LogMonitorApp:
         
         # Help info
         help_label = ttk.Label(settings_frame, 
-                              text="Note: With transparent background, make sure\ntext color differs from background color.",
+                              text="Not: Şeffaf arka plan ile, metin renginin\narka plan renginden farklı olduğundan emin olun.",
                               font=("Arial", 8), foreground="gray")
         help_label.grid(row=5, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
         
@@ -364,24 +364,24 @@ class LogMonitorApp:
             help_label.configure(foreground="black")
         
         # Width and height
-        ttk.Label(settings_frame, text="Width:").grid(row=6, column=0, sticky=tk.W, pady=5)
+        ttk.Label(settings_frame, text="Genişlik:").grid(row=6, column=0, sticky=tk.W, pady=5)
         width_var = tk.IntVar(value=self.overlay_settings["width"])
         width_spinner = ttk.Spinbox(settings_frame, from_=200, to=800, textvariable=width_var, width=5)
         width_spinner.grid(row=6, column=1, sticky=tk.W, pady=5)
-        
-        ttk.Label(settings_frame, text="Height:").grid(row=7, column=0, sticky=tk.W, pady=5)
+
+        ttk.Label(settings_frame, text="Yükseklik:").grid(row=7, column=0, sticky=tk.W, pady=5)
         height_var = tk.IntVar(value=self.overlay_settings["height"])
         height_spinner = ttk.Spinbox(settings_frame, from_=100, to=600, textvariable=height_var, width=5)
         height_spinner.grid(row=7, column=1, sticky=tk.W, pady=5)
         
         # Maximum lines to display
-        ttk.Label(settings_frame, text="Max Death Lines:").grid(row=8, column=0, sticky=tk.W, pady=5)
+        ttk.Label(settings_frame, text="Maksimum Ölüm Kayıtları:").grid(row=8, column=0, sticky=tk.W, pady=5)
         max_lines_var = tk.IntVar(value=self.overlay_settings["max_lines"])
         max_lines_spinner = ttk.Spinbox(settings_frame, from_=1, to=20, textvariable=max_lines_var, width=5)
         max_lines_spinner.grid(row=8, column=1, sticky=tk.W, pady=5)
         
         # Time threshold for death lines
-        ttk.Label(settings_frame, text="Keep Death Lines (minutes):").grid(row=9, column=0, sticky=tk.W, pady=5)
+        ttk.Label(settings_frame, text="Ölüm Kayıtlarını Sakla (dakika):").grid(row=9, column=0, sticky=tk.W, pady=5)
         time_threshold_var = tk.IntVar(value=self.overlay_settings["time_threshold"])
         time_threshold_spinner = ttk.Spinbox(settings_frame, from_=1, to=60, textvariable=time_threshold_var, width=5)
         time_threshold_spinner.grid(row=9, column=1, sticky=tk.W, pady=5)
@@ -417,9 +417,9 @@ class LogMonitorApp:
             
             # Close settings window
             settings_window.destroy()
-        
-        ttk.Button(buttons_frame, text="Save", command=save_settings).pack(side=tk.LEFT, padx=5)
-        ttk.Button(buttons_frame, text="Cancel", command=settings_window.destroy).pack(side=tk.LEFT, padx=5)
+
+        ttk.Button(buttons_frame, text="Kaydet", command=save_settings).pack(side=tk.LEFT, padx=5)
+        ttk.Button(buttons_frame, text="İptal", command=settings_window.destroy).pack(side=tk.LEFT, padx=5)
 
     def ensure_different_colors(self):
         """Ensure text and background colors are different to prevent text from disappearing with transparency"""
@@ -591,7 +591,7 @@ class LogMonitorApp:
     def find_game_log(self):
         # If we already have a path from settings and it exists, use it
         if self.log_file_path and self.log_file_path.exists():
-            self.status_label.config(text=f"Found Game.log: {self.log_file_path}")
+            self.status_label.config(text=f"Game.log bulundu: {self.log_file_path}")
             self.toggle_button.config(state=tk.NORMAL)
             return
             
@@ -599,25 +599,25 @@ class LogMonitorApp:
         for path in self.default_game_log_paths:
             if path.exists():
                 self.log_file_path = path
-                self.status_label.config(text=f"Found Game.log: {path}")
+                self.status_label.config(text=f"Game.log konumu: {path}")
                 self.toggle_button.config(state=tk.NORMAL)
                 # Save the found path
                 self.save_settings()
                 return
                 
         # If not found, prompt the user
-        self.status_label.config(text="Game.log not found. Please select file location.")
+        self.status_label.config(text="Game.log dosyası bulunamadı. Lütfen dosya konumunu seçin.")
         self.toggle_button.config(state=tk.DISABLED)
 
     def select_log_file(self):
         file_path = filedialog.askopenfilename(
-            title="Select Game.log File",
+            title="Game.log Dosyasını Seçin",
             filetypes=[("Log Files", "*.log"), ("All Files", "*.*")]
         )
         
         if file_path:
             self.log_file_path = Path(file_path)
-            self.status_label.config(text=f"Selected: {self.log_file_path}")
+            self.status_label.config(text=f"Seçildi: {self.log_file_path}")
             self.toggle_button.config(state=tk.NORMAL)
             # Save the selected path
             self.save_settings()
@@ -630,11 +630,11 @@ class LogMonitorApp:
 
     def start_monitoring(self):
         if not self.log_file_path or not self.log_file_path.exists():
-            messagebox.showerror("Error", "Game.log file not found. Please select a valid file.")
+            messagebox.showerror("Error", "Game.log dosyası bulunamadı. Lütfen geçerli bir dosya seçin.")
             return
             
         self.monitoring = True
-        self.toggle_button.config(text="Stop Monitoring")
+        self.toggle_button.config(text="Durdur")
         self.status_label.config(text=f"Monitoring: {self.log_file_path}")
 
         # Start Discord webhook if enabled
@@ -788,7 +788,7 @@ class LogMonitorApp:
         
         # Show initial message
         self.death_text.config(state=tk.NORMAL)
-        self.death_text.insert(tk.END, "Waiting for death events...\n", "death_line")
+        self.death_text.insert(tk.END, "Ölüm olayları bekleniyor...\n", "death_line")
         self.death_text.config(state=tk.DISABLED)
 
         # Set click-through if overlay starts locked
@@ -860,9 +860,8 @@ class LogMonitorApp:
 
         # Update status label to show locked/unlocked state
         if self.overlay_window:
-            locked_status = "locked" if self.overlay_locked else "unlocked"
-            click_status = "click-through" if self.overlay_locked else "draggable"
-            self.status_label.config(text=f"Overlay {locked_status} - {click_status}")
+            locked_status = "kilitli" if self.overlay_locked else "kilidi açık"            
+            self.status_label.config(text=f"Overlay {locked_status}")
 
             # Add border when unlocked, remove when locked
             if not self.overlay_locked:
@@ -1299,7 +1298,7 @@ class LogMonitorApp:
         # Create new window if it doesn't exist or was closed
         if not hasattr(self, 'records_window') or not self.records_window or not self.records_window.winfo_exists():
             self.records_window = tk.Toplevel(self.root)
-            self.records_window.title("Death Records")
+            self.records_window.title("Ölüm Kayıtları")
             self.records_window.geometry("800x600")
             self.records_window.minsize(600, 400)
             
@@ -1308,7 +1307,7 @@ class LogMonitorApp:
             main_frame.pack(fill=tk.BOTH, expand=True)
             
             # Add title
-            title_label = ttk.Label(main_frame, text="Death Records", font=("Arial", 14, "bold"))
+            title_label = ttk.Label(main_frame, text="Ölüm Kayıtları", font=("Arial", 14, "bold"))
             title_label.pack(pady=(0, 10))
             
             # Add records listbox with scrollbar inside a frame
@@ -1341,17 +1340,17 @@ class LogMonitorApp:
             buttons_frame.pack(fill=tk.X, pady=10)
             
             # Add clear button
-            clear_button = ttk.Button(buttons_frame, text="Clear All Records", 
+            clear_button = ttk.Button(buttons_frame, text="Tüm Kayıtları Temizle", 
                                     command=self.clear_records)
             clear_button.pack(side=tk.LEFT, padx=5)
             
             # Add export button
-            export_button = ttk.Button(buttons_frame, text="Export Records", 
+            export_button = ttk.Button(buttons_frame, text="Kayıtları Dışa Aktar", 
                                      command=self.export_records)
             export_button.pack(side=tk.LEFT, padx=5)
             
             # Add close button
-            close_button = ttk.Button(buttons_frame, text="Close", 
+            close_button = ttk.Button(buttons_frame, text="Kapat", 
                                     command=self.records_window.destroy)
             close_button.pack(side=tk.RIGHT, padx=5)
             
@@ -1475,9 +1474,9 @@ class LogMonitorApp:
         self.toggle_overlay_lock()
         # Update button text
         if self.overlay_locked:
-            self.lock_button.config(text="Unlock Overlay")
+            self.lock_button.config(text="Overlay Kilidini Kaldır")
         else:
-            self.lock_button.config(text="Lock Overlay")
+            self.lock_button.config(text="Overlay Kilitle")
 
     def toggle_discord_webhook(self):
         """Toggle Discord webhook on/off"""
@@ -1487,11 +1486,11 @@ class LogMonitorApp:
         # Start/stop webhook based on enabled status and monitoring state
         if self.monitoring and self.discord_settings['enabled']:
             self.discord_webhook.start()
-            self.status_label.config(text="Discord webhook enabled - posting your kills only")
+            self.status_label.config(text="Discord bildirimleri etkin")
         else:
             self.discord_webhook.stop()
             if self.monitoring:
-                self.status_label.config(text=f"Monitoring: {self.log_file_path}")
+                self.status_label.config(text=f"İzleniyor: {self.log_file_path}")
 
         # Save to config
         self.save_settings()
@@ -1500,12 +1499,12 @@ class LogMonitorApp:
         """Update the account name label"""
         if self.account_name:
             self.account_label.config(
-                text=f"Account: {self.account_name}",
+                text=f"Hesap: {self.account_name}",
                 foreground="#0066CC",
                 font=("Arial", 10, "bold")
             )
         else:
-            self.account_label.config(text="Account: Not detected", foreground="gray")
+            self.account_label.config(text="Hesap: Bulunamadı", foreground="gray")
 
     def parse_account_name(self, line):
         """
