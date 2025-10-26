@@ -20,11 +20,21 @@ GWL_EXSTYLE = -20
 WS_EX_LAYERED = 0x00080000
 WS_EX_TRANSPARENT = 0x00000020
 
+def get_resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
 # Load weapon IDs globally
 WEAPON_IDS = {}
 try:
-    weapon_ids_path = Path("weapon_ids.json")
-    if weapon_ids_path.exists():
+    weapon_ids_path = get_resource_path("weapon_ids.json")
+    if os.path.exists(weapon_ids_path):
         with open(weapon_ids_path, 'r', encoding='utf-8') as file:
             WEAPON_IDS = json.load(file)
         print(f"Loaded {len(WEAPON_IDS)} weapon IDs from weapon_ids.json")
@@ -36,8 +46,8 @@ except Exception as e:
 # Load location IDs globally
 LOCATION_IDS = {}
 try:
-    location_ids_path = Path("location_ids.json")
-    if location_ids_path.exists():
+    location_ids_path = get_resource_path("location_ids.json")
+    if os.path.exists(location_ids_path):
         with open(location_ids_path, 'r', encoding='utf-8') as file:
             LOCATION_IDS = json.load(file)
         print(f"Loaded {len(LOCATION_IDS)} location IDs from location_ids.json")
@@ -510,8 +520,8 @@ class LogMonitorApp:
 
     def create_icon_image(self):
         # Try to load existing icon file
-        icon_path = Path("app_icon.png")
-        if icon_path.exists():
+        icon_path = get_resource_path("app_icon.png")
+        if os.path.exists(icon_path):
             try:
                 return Image.open(icon_path)
             except Exception:
