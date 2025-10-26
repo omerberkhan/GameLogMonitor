@@ -31,8 +31,10 @@ Thumbs.db
 desktop.ini
 
 # Application specific
+# Ignore generated ICO files (PNG files are source files and should be tracked)
 app_icon.ico
-app_icon.png
+static/app_icon.ico
+static/window_icon.ico
 *.log
 Game.log
 

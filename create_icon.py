@@ -1,47 +1,58 @@
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
+import os
 
-def create_app_icon():
-    # Create a new image with transparent background
-    img = Image.new('RGBA', (256, 256), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    
-    # Draw a circle for the background
-    draw.ellipse((10, 10, 246, 246), fill=(50, 50, 100, 255), outline=(200, 200, 255, 255), width=4)
-    
-    # Draw a smaller inner circle
-    draw.ellipse((40, 40, 216, 216), fill=(40, 40, 80, 255))
-    
-    # Add text
+def convert_png_to_ico(png_filename, ico_filename):
+    """Convert a PNG file to ICO format with multiple sizes"""
+    png_path = os.path.join("static", png_filename)
+    ico_path = os.path.join("static", ico_filename)
+
+    if not os.path.exists(png_path):
+        print(f"Warning: {png_path} not found! Skipping...")
+        return False
+
     try:
-        font = ImageFont.truetype("arial.ttf", 80)
-    except IOError:
-        try:
-            # Try a more generic approach
-            font = ImageFont.load_default()
-        except:
-            print("Couldn't load font, using default")
-            font = None
-    
-    text = "GLM"
-    if font:
-        # Get text dimensions to center it
-        text_bbox = draw.textbbox((0, 0), text, font=font)
-        text_width = text_bbox[2] - text_bbox[0]
-        text_height = text_bbox[3] - text_bbox[1]
-        
-        text_x = (256 - text_width) // 2
-        text_y = (256 - text_height) // 2
-        
-        draw.text((text_x, text_y), text, font=font, fill=(200, 200, 255, 255))
+        # Load the existing PNG image
+        img = Image.open(png_path)
+
+        # Convert to RGBA if not already
+        if img.mode != 'RGBA':
+            img = img.convert('RGBA')
+
+        # Save as ICO with multiple sizes for better quality at different resolutions
+        img.save(ico_path, sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+
+        print(f"[OK] Created {ico_filename} from {png_filename}")
+        return True
+
+    except Exception as e:
+        print(f"[ERROR] Converting {png_filename}: {e}")
+        return False
+
+def create_app_icons():
+    """Convert all PNG icons to ICO format for the application"""
+    print("Converting PNG icons to ICO format...\n")
+
+    # Define icon conversions
+    icons = [
+        ("window_icon.png", "window_icon.ico"),  # For all application windows
+        ("app_icon.png", "app_icon.ico"),        # For executable
+    ]
+
+    success_count = 0
+    for png_file, ico_file in icons:
+        if convert_png_to_ico(png_file, ico_file):
+            success_count += 1
+
+    # Check for tray icon (doesn't need ICO conversion, used as PNG)
+    tray_png = os.path.join("static", "tray_icon.png")
+    if os.path.exists(tray_png):
+        print("[OK] Found tray_icon.png (used directly for system tray)")
+        success_count += 1
     else:
-        # Fallback if font loading fails
-        draw.text((90, 100), text, fill=(200, 200, 255, 255))
-    
-    # Save the icon in multiple formats
-    img.save("static/app_icon.ico", sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (256, 256)])
-    img.save("static/app_icon.png")
-    
-    print("Icon created successfully: app_icon.ico and app_icon.png")
+        print("[WARN] tray_icon.png not found!")
+
+    print(f"\nIcon conversion complete: {success_count}/{len(icons) + 1} icons ready")
+    return success_count > 0
 
 if __name__ == "__main__":
-    create_app_icon() 
+    create_app_icons() 

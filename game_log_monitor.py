@@ -63,6 +63,14 @@ class LogMonitorApp:
         self.root.title("Kill Collector - Atmosfer")
         self.root.geometry("750x250")  # Height increased to fit Discord frame and account label
         self.root.resizable(False, False)
+
+        # Set window icon
+        try:
+            icon_path = get_resource_path(os.path.join("static", "window_icon.ico"))
+            if os.path.exists(icon_path):
+                self.root.iconbitmap(icon_path)
+        except Exception as e:
+            print(f"Could not set window icon: {e}")
         
         # Config file path
         self.config_dir = Path.home() / "AppData" / "Local" / "GameLogMonitor"
@@ -277,6 +285,14 @@ class LogMonitorApp:
         settings_window.resizable(False, False)
         settings_window.transient(self.root)
         settings_window.grab_set()
+
+        # Set window icon
+        try:
+            icon_path = get_resource_path(os.path.join("static", "window_icon.ico"))
+            if os.path.exists(icon_path):
+                settings_window.iconbitmap(icon_path)
+        except Exception as e:
+            print(f"Could not set settings window icon: {e}")
         
         # Create settings frame
         settings_frame = ttk.Frame(settings_window, padding="10")
@@ -557,17 +573,17 @@ class LogMonitorApp:
         )
         
         # Create tray icon
-        self.tray_icon = pystray.Icon("GameLogMonitor", icon_image, "Game Log Monitor", menu)
+        self.tray_icon = pystray.Icon("KillCollector", icon_image, "Kill Collector", menu)
         
         # Start tray icon in a separate thread
         threading.Thread(target=self.tray_icon.run, daemon=True).start()
 
     def create_icon_image(self):
-        # Try to load existing icon file
-        icon_path = get_resource_path("app_icon.png")
-        if os.path.exists(icon_path):
+        # Try to load existing icon file (prefer PNG for better quality in tray)
+        png_path = get_resource_path(os.path.join("static", "tray_icon.png"))
+        if os.path.exists(png_path):
             try:
-                return Image.open(icon_path)
+                return Image.open(png_path)
             except Exception:
                 pass
                 
@@ -693,7 +709,15 @@ class LogMonitorApp:
     def create_overlay_window(self):
         self.overlay_window = tk.Toplevel(self.root)
         self.overlay_window.title("Death Feed Overlay")
-        
+
+        # Set window icon
+        try:
+            icon_path = get_resource_path(os.path.join("static", "window_icon.ico"))
+            if os.path.exists(icon_path):
+                self.overlay_window.iconbitmap(icon_path)
+        except Exception as e:
+            print(f"Could not set overlay icon: {e}")
+
         # Set initial position using settings values
         width = self.overlay_settings["width"]
         height = self.overlay_settings["height"]
@@ -977,14 +1001,27 @@ class LogMonitorApp:
                         if self.discord_settings['enabled'] and self.discord_webhook.enabled:
                             killer = parsed_data.get('killer', '')
                             victim = parsed_data.get('actor', '')
+                            damage_type = parsed_data.get('damage', '').lower()
 
-                            # Only post if I (account_name) am the killer
+                            # Filter conditions
+                            is_npc_kill = '_NPC_' in killer or '_NPC_' in victim
+                            is_suicide = 'suicide' in damage_type or killer == victim
+
+                            # Only post if:
+                            # 1. I (account_name) am the killer
+                            # 2. Not an NPC kill
+                            # 3. Not a suicide
                             if self.account_name and killer == self.account_name:
-                                # Add display names
-                                parsed_data['weapon_display'] = self.get_weapon_name(parsed_data.get('weapon'))
-                                parsed_data['location_display'] = self.get_location_name(parsed_data.get('location'))
-                                print(f"[Discord] Posting kill: {self.account_name} killed {victim}")
-                                self.discord_webhook.send_death_record(parsed_data)
+                                if is_npc_kill:
+                                    print(f"[Debug] Skipping Discord - NPC kill: {killer} killed {victim}")
+                                elif is_suicide:
+                                    print(f"[Debug] Skipping Discord - Suicide: {killer}")
+                                else:
+                                    # Add display names
+                                    parsed_data['weapon_display'] = self.get_weapon_name(parsed_data.get('weapon'))
+                                    parsed_data['location_display'] = self.get_location_name(parsed_data.get('location'))
+                                    print(f"[Discord] Posting kill: {self.account_name} killed {victim}")
+                                    self.discord_webhook.send_death_record(parsed_data)
                             else:
                                 print(f"[Debug] Skipping Discord - Killer: {killer}, Victim: {victim}, My account: {self.account_name}")
                     else:
@@ -1301,6 +1338,14 @@ class LogMonitorApp:
             self.records_window.title("Ölüm Kayıtları")
             self.records_window.geometry("800x600")
             self.records_window.minsize(600, 400)
+
+            # Set window icon
+            try:
+                icon_path = get_resource_path(os.path.join("static", "window_icon.ico"))
+                if os.path.exists(icon_path):
+                    self.records_window.iconbitmap(icon_path)
+            except Exception as e:
+                print(f"Could not set records window icon: {e}")
             
             # Create main frame
             main_frame = ttk.Frame(self.records_window, padding="10")

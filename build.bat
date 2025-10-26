@@ -19,7 +19,7 @@ if %ERRORLEVEL% NEQ 0 (
 
 :: Build the executable using our spec file
 echo Building executable...
-pyinstaller --clean GameLogMonitor.spec
+pyinstaller --clean KillCollector.spec
 if %ERRORLEVEL% NEQ 0 (
     echo Failed to build executable!
     exit /b 1
