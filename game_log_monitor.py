@@ -14,6 +14,7 @@ import configparser
 import json
 import ctypes
 from ctypes import wintypes
+from discord_webhook import DiscordWebhook
 
 # Windows API constants for click-through overlay
 GWL_EXSTYLE = -20
@@ -60,7 +61,7 @@ class LogMonitorApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Game Log Monitor")
-        self.root.geometry("700x180")  # Increased width to fit the Records button
+        self.root.geometry("750x250")  # Height increased to fit Discord frame and account label
         self.root.resizable(False, False)
         
         # Config file path
@@ -78,11 +79,21 @@ class LogMonitorApp:
         self.overlay_window = None
         self.overlay_locked = True
         self.monitor_thread = None
+        self.account_name = None  # Detected account name from log
         
         # Use the statically loaded weapon IDs and location IDs
         self.weapon_ids = WEAPON_IDS
         self.location_ids = LOCATION_IDS
-        
+
+        # Discord webhook settings (hardcoded URL)
+        self.discord_webhook_url = "https://discord.com/api/webhooks/1432103994591023195/deu6EG08NMtmVoU8Yjt-wbbLgnGXSsUUfN7qNvjzCMR1y9rKy2hESa69tKMjdhHdaAt2"
+        self.discord_settings = {
+            "enabled": False
+        }
+
+        # Initialize Discord webhook with hardcoded URL
+        self.discord_webhook = DiscordWebhook(self.discord_webhook_url)
+
         # Overlay appearance settings with defaults
         self.overlay_settings = {
             "bg_color": "#000000",
@@ -134,6 +145,10 @@ class LogMonitorApp:
                     path = config['General']['log_file_path']
                     if path and Path(path).exists():
                         self.log_file_path = Path(path)
+
+                # Load account name
+                if 'General' in config and 'account_name' in config['General']:
+                    self.account_name = config['General']['account_name']
                 
                 # Load overlay settings
                 if 'Overlay' in config:
@@ -146,6 +161,12 @@ class LogMonitorApp:
                                 self.overlay_settings[key] = float(config['Overlay'][key])
                             else:
                                 self.overlay_settings[key] = config['Overlay'][key]
+
+                # Load Discord settings
+                if 'Discord' in config:
+                    if 'enabled' in config['Discord']:
+                        self.discord_settings['enabled'] = config['Discord'].getboolean('enabled')
+
             except Exception as e:
                 print(f"Error loading settings: {e}")
 
@@ -156,12 +177,16 @@ class LogMonitorApp:
             
             # General settings
             config['General'] = {
-                'log_file_path': str(self.log_file_path) if self.log_file_path else ''
+                'log_file_path': str(self.log_file_path) if self.log_file_path else '',
+                'account_name': self.account_name if self.account_name else ''
             }
             
             # Overlay settings
             config['Overlay'] = {k: str(v) for k, v in self.overlay_settings.items()}
-            
+
+            # Discord settings
+            config['Discord'] = {k: str(v) for k, v in self.discord_settings.items()}
+
             # Save to file
             with open(self.config_file, 'w') as f:
                 config.write(f)
@@ -175,7 +200,12 @@ class LogMonitorApp:
         
         # Title label
         title_label = ttk.Label(main_frame, text="Game Log Monitor", font=("Arial", 14, "bold"))
-        title_label.pack(pady=(0, 10))
+        title_label.pack(pady=(0, 5))
+
+        # Account name label
+        self.account_label = ttk.Label(main_frame, text="", font=("Arial", 10))
+        self.account_label.pack(pady=(0, 5))
+        self.update_account_display()
         
         # Status frame
         status_frame = ttk.LabelFrame(main_frame, text="Status", padding="5")
@@ -208,7 +238,21 @@ class LogMonitorApp:
         # Records button
         self.records_button = ttk.Button(buttons_frame, text="Show Records", width=15, command=self.show_records_window)
         self.records_button.pack(side=tk.LEFT, padx=5)
-        
+
+        # Discord webhook frame
+        discord_frame = ttk.LabelFrame(main_frame, text="Discord Integration", padding="5")
+        discord_frame.pack(fill=tk.X, pady=5)
+
+        # Enable Discord checkbox
+        self.discord_enabled_var = tk.BooleanVar(value=self.discord_settings['enabled'])
+        self.discord_check = ttk.Checkbutton(
+            discord_frame,
+            text="Enable Discord Webhook (post only when I kill someone)",
+            variable=self.discord_enabled_var,
+            command=self.toggle_discord_webhook
+        )
+        self.discord_check.pack(side=tk.LEFT, padx=5)
+
         # Display loaded weapon and location count
         weapon_count = len(self.weapon_ids)
         location_count = len(self.location_ids)
@@ -592,8 +636,13 @@ class LogMonitorApp:
         self.monitoring = True
         self.toggle_button.config(text="Stop Monitoring")
         self.status_label.config(text=f"Monitoring: {self.log_file_path}")
-        
-        
+
+        # Start Discord webhook if enabled
+        print(f"[Debug] Starting monitoring - Discord settings enabled: {self.discord_settings['enabled']}, webhook enabled: {self.discord_webhook.enabled}")
+        if self.discord_settings['enabled']:
+            print("[Debug] Starting Discord webhook...")
+            self.discord_webhook.start()
+
         # Create overlay window if it doesn't exist
         if not self.overlay_window:
             self.create_overlay_window()
@@ -627,7 +676,10 @@ class LogMonitorApp:
         self.monitoring = False
         self.toggle_button.config(text="Start Monitoring")
         self.status_label.config(text=f"Monitoring stopped. Log file: {self.log_file_path}")
-        
+
+        # Stop Discord webhook
+        self.discord_webhook.stop()
+
         # Hide overlay window
         if self.overlay_window:
             # Save current position before hiding
@@ -824,10 +876,34 @@ class LogMonitorApp:
     def monitor_log_file(self):
         # Initial file position
         file_position = 0
-        
+
+        # Try to detect account name from existing log file
+        if not self.account_name and self.log_file_path.exists():
+            try:
+                print("[Info] Scanning entire log file for account name...")
+                with open(self.log_file_path, 'r', encoding='utf-8', errors='ignore') as file:
+                    # Read the entire file
+                    line_count = 0
+                    for line in file:
+                        line_count += 1
+
+                        # Check for account name
+                        detected_name = self.parse_account_name(line)
+                        if detected_name:
+                            self.account_name = detected_name
+                            print(f"[Info] Found account name from log (line {line_count}): {self.account_name}")
+                            self.root.after(0, self.update_account_display)
+                            self.root.after(0, self.save_settings)
+                            break
+
+                    if not self.account_name:
+                        print(f"[Info] Scanned {line_count} lines, account name not found")
+            except Exception as e:
+                print(f"[Warning] Could not scan log for account name: {e}")
+
         if self.log_file_path.exists():
             file_position = self.log_file_path.stat().st_size
-        
+
         # Monitor loop
         while self.monitoring:
             try:
@@ -848,12 +924,23 @@ class LogMonitorApp:
                         with open(self.log_file_path, 'r', encoding='utf-8', errors='ignore') as file:
                             file.seek(file_position)
                             new_lines = file.readlines()
-                            
-                            # Filter lines containing Actor Death
-                            # Both old and new formats are supported:
-                            # Old: <Actor Death> at start of line
-                            # New: Contains [Notice] <Actor Death> in the line
+
+                            # Process each line
                             for line in new_lines:
+                                # Check for account name
+                                if not self.account_name:
+                                    detected_name = self.parse_account_name(line)
+                                    if detected_name:
+                                        self.account_name = detected_name
+                                        print(f"[Info] Detected account name: {self.account_name}")
+                                        # Update UI in main thread
+                                        self.root.after(0, self.update_account_display)
+                                        self.root.after(0, self.save_settings)
+
+                                # Filter lines containing Actor Death
+                                # Both old and new formats are supported:
+                                # Old: <Actor Death> at start of line
+                                # New: Contains [Notice] <Actor Death> in the line
                                 if line.strip().startswith("<Actor Death>") or "<Actor Death>" in line:
                                     # Add to queue for processing
                                     self.line_queue.put(line.strip())
@@ -882,10 +969,25 @@ class LogMonitorApp:
                     
                     # Parse the line to extract details
                     parsed_data = self.parse_death_line(line)
-                    
+
                     # Add parsed data to all_death_records
                     if parsed_data:
                         self.all_death_records.append(parsed_data)
+
+                        # Send to Discord if enabled - ONLY if I killed someone
+                        if self.discord_settings['enabled'] and self.discord_webhook.enabled:
+                            killer = parsed_data.get('killer', '')
+                            victim = parsed_data.get('actor', '')
+
+                            # Only post if I (account_name) am the killer
+                            if self.account_name and killer == self.account_name:
+                                # Add display names
+                                parsed_data['weapon_display'] = self.get_weapon_name(parsed_data.get('weapon'))
+                                parsed_data['location_display'] = self.get_location_name(parsed_data.get('location'))
+                                print(f"[Discord] Posting kill: {self.account_name} killed {victim}")
+                                self.discord_webhook.send_death_record(parsed_data)
+                            else:
+                                print(f"[Debug] Skipping Discord - Killer: {killer}, Victim: {victim}, My account: {self.account_name}")
                     else:
                         # If parsing failed, add the raw line
                         self.all_death_records.append(line)
@@ -1068,14 +1170,17 @@ class LogMonitorApp:
     def exit_app(self):
         # Stop monitoring before exit
         self.monitoring = False
-        
+
+        # Stop Discord webhook
+        self.discord_webhook.stop()
+
         # Save settings
         if self.overlay_window and self.overlay_window.winfo_exists():
             # Save current position
             self.overlay_settings["position_x"] = self.overlay_window.winfo_x()
             self.overlay_settings["position_y"] = self.overlay_window.winfo_y()
         self.save_settings()
-        
+
         # Stop tray icon
         self.tray_icon.stop()
         
@@ -1373,6 +1478,65 @@ class LogMonitorApp:
             self.lock_button.config(text="Unlock Overlay")
         else:
             self.lock_button.config(text="Lock Overlay")
+
+    def toggle_discord_webhook(self):
+        """Toggle Discord webhook on/off"""
+        # Update settings
+        self.discord_settings['enabled'] = self.discord_enabled_var.get()
+
+        # Start/stop webhook based on enabled status and monitoring state
+        if self.monitoring and self.discord_settings['enabled']:
+            self.discord_webhook.start()
+            self.status_label.config(text="Discord webhook enabled - posting your kills only")
+        else:
+            self.discord_webhook.stop()
+            if self.monitoring:
+                self.status_label.config(text=f"Monitoring: {self.log_file_path}")
+
+        # Save to config
+        self.save_settings()
+
+    def update_account_display(self):
+        """Update the account name label"""
+        if self.account_name:
+            self.account_label.config(
+                text=f"Account: {self.account_name}",
+                foreground="#0066CC",
+                font=("Arial", 10, "bold")
+            )
+        else:
+            self.account_label.config(text="Account: Not detected", foreground="gray")
+
+    def parse_account_name(self, line):
+        """
+        Parse account name from log line
+
+        Example line:
+        <2025-10-26T18:45:08.760Z> [Notice] <AccountLoginCharacterStatus_Character> Character: createdAt 1760624040745 - updatedAt 1760624048129 - geid 201996731201 - accountId 4624674 - name Voisys - state STATE_CURRENT [Team_GameServices][Login]
+
+        Returns:
+            Account name if found, None otherwise
+        """
+        if "<AccountLoginCharacterStatus_Character>" in line:
+            # Try multiple patterns to extract the name
+            patterns = [
+                r'- name ([^\s-]+) -',  # Match: - name Voisys -
+                r'- name ([^\s-]+)\s',  # Match: - name Voisys (space)
+                r' name ([^\s-]+) -',   # Match: name Voisys -
+                r' name ([^\s-]+)\s',   # Match: name Voisys (space)
+            ]
+
+            for pattern in patterns:
+                match = re.search(pattern, line)
+                if match:
+                    name = match.group(1)
+                    print(f"[Debug] Account name detected with pattern '{pattern}': {name}")
+                    return name
+
+            # Debug: print the line if no pattern matched
+            print(f"[Debug] Could not extract name from line: {line[:200]}")
+        return None
+
 
     def schedule_death_lines_cleanup(self):
         """Schedule regular cleanup of old death lines"""
